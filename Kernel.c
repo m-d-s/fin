@@ -1982,13 +1982,14 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Exit  ---------------------------------
 
   function Handle_Sys_Exit (returnStatus: int)
-      -- NOT IMPLEMENTED
+      printInt(returnStatus)
+      return
     endFunction
 
 -----------------------------  Handle_Sys_Shutdown  ---------------------------------
 
   function Handle_Sys_Shutdown ()
-      FatalError("Syscall 'Shutdown' was invoked by a user thread")
+      --FatalError("Syscall 'Shutdown' was invoked by a user thread")
     endFunction
 
 -----------------------------  Handle_Sys_Yield  ---------------------------------
@@ -2000,63 +2001,67 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Fork  ---------------------------------
 
   function Handle_Sys_Fork () returns int
-      -- NOT IMPLEMENTED
-      return 0
+      return 1000
     endFunction
 
 -----------------------------  Handle_Sys_Join  ---------------------------------
 
   function Handle_Sys_Join (processID: int) returns int
-      -- NOT IMPLEMENTED
-      return 0
+      printInt(processID)
+      return 2000
     endFunction
 
 -----------------------------  Handle_Sys_Exec  ---------------------------------
 
   function Handle_Sys_Exec (filename: ptr to array of char) returns int
-      -- NOT IMPLEMENTED
-      return 0
+      -- NOT IMPLEMENTED       
+      return 3000
     endFunction
 
 -----------------------------  Handle_Sys_Create  ---------------------------------
 
   function Handle_Sys_Create (filename: ptr to array of char) returns int
       -- NOT IMPLEMENTED
-      return 0
+      return 4000
     endFunction
 
 -----------------------------  Handle_Sys_Open  ---------------------------------
 
   function Handle_Sys_Open (filename: ptr to array of char) returns int
       -- NOT IMPLEMENTED
-      return 0
+      return 5000
     endFunction
 
 -----------------------------  Handle_Sys_Read  ---------------------------------
 
   function Handle_Sys_Read (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
-      -- NOT IMPLEMENTED
-      return 0
+      printInt(fileDesc)
+
+      printInt(sizeInBytes)
+      return 6000
     endFunction
 
 -----------------------------  Handle_Sys_Write  ---------------------------------
 
   function Handle_Sys_Write (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
-      -- NOT IMPLEMENTED
-      return 0
+      printInt(fileDesc)
+
+      printInt(sizeInBytes)
+      return 7000
     endFunction
 
 -----------------------------  Handle_Sys_Seek  ---------------------------------
 
   function Handle_Sys_Seek (fileDesc: int, newCurrentPos: int) returns int
-      -- NOT IMPLEMENTED
-      return 0
+      printInt(fileDesc)
+      printInt(newCurrentPos)
+      return 8000
     endFunction
 
 -----------------------------  Handle_Sys_Close  ---------------------------------
 
   function Handle_Sys_Close (fileDesc: int)
-      -- NOT IMPLEMENTED
+      printInt(fileDesc)
     endFunction
 
 -----------------------------  DiskDriver  ---------------------------------
