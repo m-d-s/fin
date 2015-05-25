@@ -103,7 +103,7 @@ header Kernel
     FatalError_ThreadVersion (errorMessage: ptr to array of char)
     SetInterruptsTo (newStatus: int) returns int
     ProcessFinish (exitStatus: int)
-
+    InitFirstProcess ()
     -- Routines from Switch.s:
 
     external Switch (prevThread, nextThread: ptr to Thread)

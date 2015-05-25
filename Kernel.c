@@ -1207,6 +1207,58 @@ behavior HoareCondition
       FatalError ("ProcessFinish is not implemented")
     endFunction
 
+----------------------------- InitFirstProcess  --------------------------
+-- In order to run a user level program we will first need to obtain a thre to supply 
+-- the program with its own cpu context. To do this you must request a thread from 
+-- the thread manager, initialize it, and fork. You do not want to just fork the current 
+-- thread because this function must return after it has completed this work. 
+  function InitFirstProcess ()
+    var
+      obtainedThread: ptr to Thread
+
+    obtainedThread = threadManager.GetANewThread ()  -- Get a new thread from the thread manager
+    obtainedThread.Init ("UserProgram")              -- Initialize the retrieved thread
+    obtainedThread.Fork (StartUserProcess, 0)        -- Fork thread passing control to StartUserProcess
+    endFunction
+
+----------------------------- StartUserProcess  --------------------------
+  function StartUserProcess (arg: int)
+    var 
+      oldIntStat, initPC, initStackTop: int
+      initSystemStackTop: ptr to int
+      obtainedPCB: ptr to ProcessControlBlock
+      openFile: ptr to OpenFile
+
+
+    obtainedPCB = processManager.GetANewProcess ()   -- Get a process control block from the process manager
+    obtainedPCB.Init ()                              -- Initialize the process control block
+
+    obtainedPCB.myThread = currentThread             -- Set the myThread field to currentThread
+    currentThread.myProcess = obtainedPCB            -- Set the myProcess field to obtainedPCB
+
+    openFile = fileManager.Open("MyProgram") -- Open a file using the file manager, filename currently hardcoded
+
+    if openFile == null                      -- report an error if the OpenFile object is null
+        FatalError("Encontered problem trying to open file")
+    endIf
+    
+    initPC = openFile.LoadExecutable(&obtainedPCB.addrSpace) -- Load executable program and catch program counter
+      
+    if initPC == -1                          -- report an error if a problem occured during exec load
+        FatalError("Encountered problem trying to load executable")
+    endIf
+     
+    fileManager.Close(openFile)                       -- Close the open file to free OpenFile system resource
+    
+    initStackTop = obtainedPCB.addrSpace.numberOfPages * PAGE_SIZE  -- Calculate the initial top of the user level stack
+    initSystemStackTop = &currentThread.systemStack[SYSTEM_STACK_SIZE - 1] -- clean up system stack
+
+    oldIntStat = SetInterruptsTo (DISABLED)           -- Disable interrupts
+    obtainedPCB.addrSpace.SetToThisPageTable ()                 -- Initialize page table registers for this process
+    currentThread.isUserThread = true                 -- indicate that thread is controlled by user level process
+    BecomeUserThread(initStackTop, initPC, *initSystemStackTop) -- jump into user level main routine and never return
+    endFunction
+
 -----------------------------  FrameManager  ---------------------------------
 -- The frame manager was somewhat more involved than the process and thread manager.
 -- The main difficulty that I faced was knowing how and when to translate address
@@ -1734,15 +1786,12 @@ behavior HoareCondition
     -- This is an interrupt handler.  As such, interrupts will be DISABLED
     -- for the duration of its execution.
     --
--- Uncomment this code later...
-      FatalError ("DISK INTERRUPTS NOT EXPECTED IN PROJECT 4")
-/*
       currentInterruptStatus = DISABLED
       -- print ("DiskInterruptHandler invoked!\n")
       if diskDriver.semToSignalOnCompletion
         diskDriver.semToSignalOnCompletion.Up()
       endIf
-*/
+
     endFunction
 
 -----------------------------  SerialInterruptHandler  --------------------------
@@ -1939,7 +1988,7 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Shutdown  ---------------------------------
 
   function Handle_Sys_Shutdown ()
-      -- NOT IMPLEMENTED
+      FatalError("Syscall 'Shutdown' was invoked by a user thread")
     endFunction
 
 -----------------------------  Handle_Sys_Yield  ---------------------------------
