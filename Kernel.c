@@ -1253,7 +1253,7 @@ behavior HoareCondition
     obtainedPCB.myThread = currentThread             -- Set the myThread field to currentThread
     currentThread.myProcess = obtainedPCB            -- Set the myProcess field to obtainedPCB
 
-    openFile = fileManager.Open("MyProgram") -- Open a file using the file manager, filename currently hardcoded
+    openFile = fileManager.Open("TestProgram1") -- Open a file using the file manager, filename currently hardcoded
 
     if openFile == null                      -- report an error if the OpenFile object is null
         FatalError("Encontered problem trying to open file")
@@ -1274,6 +1274,7 @@ behavior HoareCondition
     obtainedPCB.addrSpace.SetToThisPageTable ()       -- Initialize page table registers for this process
     currentThread.isUserThread = true                 -- indicate that thread is controlled by user level process
     BecomeUserThread(initStackTop, initPC, initSystemStackTop asInteger) -- jump into user level main routine and never return
+    FatalError("Program not meant to continue to this point")
     endFunction
 
 -----------------------------  FrameManager  ---------------------------------
@@ -1996,31 +1997,36 @@ behavior HoareCondition
       return 0
     endFunction
 
---------------------------- PrintVirtualString ---------------------------------
-  function PrintVirtualString (src: ptr to array of char) 
+--------------------------- LocalizeVirtualString ---------------------------------
+-- Take an array of characters that is in the current threads virtual address
+-- space, copy it's contents into a buffer array that gets created on the 
+-- system stack, and return a pointer to the string. This function was modeled from the routine
+-- described on page 30 of the assignment #5 specification.
+  function LocalizeVirtualString (src: ptr to array of char) returns ptr to array [*] of char 
       var
         strBuff: array [MAX_STRING_SIZE] of char
         retVal: int
-
+      
       retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&strBuff,
                                                                       src asInteger,
                                                                       MAX_STRING_SIZE)
       if  retVal < 0
-         FatalError("Error occurred while attempting to fetch string from virtual address space")
-      else
-         print(&strBuff)
+         return null
       endIf
+         return &strBuff
     endFunction
 
 -----------------------------  Handle_Sys_Exit  ---------------------------------
-
+-- Simply print the integer argument
   function Handle_Sys_Exit (returnStatus: int)
-      printInt(returnStatus)
+      print ("Handel_Sys_Exit invoked!\n")
+      printIntVar ("returnStatus", returnStatus)
       return
     endFunction
 
 -----------------------------  Handle_Sys_Shutdown  ---------------------------------
-
+-- Generate a fatal error to notify the user that the 'Shutdown' system call has
+-- been invoked
   function Handle_Sys_Shutdown ()
       FatalError("Syscall 'Shutdown' was invoked by a user thread")
     endFunction
@@ -2028,73 +2034,128 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Yield  ---------------------------------
 
   function Handle_Sys_Yield ()
-      -- NOT IMPLEMENTED
+      print ("Handle_Sys_Yield invoked!\n")
     endFunction
 
 -----------------------------  Handle_Sys_Fork  ---------------------------------
-
+-- simply return an integer value from the system call
   function Handle_Sys_Fork () returns int
+      print ("Handle_Sys_Fork invoked!\n")
       return 1000
     endFunction
 
 -----------------------------  Handle_Sys_Join  ---------------------------------
-
+-- Simply print the integer argument, and return an integer value from the system call
   function Handle_Sys_Join (processID: int) returns int
-      printInt(processID)
+      print ("Handle_Sys_Join invoked!\n")
+      printIntVar("processID", processID)
       return 2000
     endFunction
 
 -----------------------------  Handle_Sys_Exec  ---------------------------------
-
+-- Print the argument by calling PrintVirtualString, then return an integer value
   function Handle_Sys_Exec (filename: ptr to array of char) returns int
-      PrintVirtualString(filename)
+
+    var 
+      oldIntStat, initPC, initStackTop: int
+      initSystemStackTop: ptr to void
+      openFile: ptr to OpenFile
+      newAddrSpace: AddrSpace = new AddrSpace  
+      localString: ptr to array [*] of char
+    localString = LocalizeVirtualString(filename)
+
+    if localString == null
+        print("Error occurred while attempting to localize string\n")
+        return -1
+    endIf
+print(localString)
+        openFile = fileManager.Open(localString) -- Open a file using the file manager
+
+    if openFile == null                      -- report an error if the OpenFile object is null
+      print("Error occurred while attempting to open a file\n")
+      return -1
+    endIf
+    
+    initPC = openFile.LoadExecutable(&newAddrSpace) -- Load executable program, create logical address space and catch program counter
+      
+    if initPC == -1                          -- report an error if a problem occured during exec load
+        FatalError("Encountered problem trying to load executable")
+    endIf
+    
+    fileManager.Close(openFile)                       -- Close the open file to free OpenFile system resource
+
+    frameManager.ReturnAllFrames(&currentThread.myProcess.addrSpace)
+    currentThread.myProcess.addrSpace = newAddrSpace    
+
+    initStackTop = newAddrSpace.numberOfPages * PAGE_SIZE  -- Calculate the initial top of the user level stack
+    initSystemStackTop = &currentThread.systemStack[SYSTEM_STACK_SIZE - 1] -- clean up system stack
+
+    oldIntStat = SetInterruptsTo (DISABLED)           -- Disable interrupts
+    newAddrSpace.SetToThisPageTable ()       -- Initialize page table registers for this process
+    currentThread.isUserThread = true                 -- indicate that thread is controlled by user level process
+    BecomeUserThread(initStackTop, initPC, initSystemStackTop asInteger) -- jump into user level main routine and never return
+    FatalError("Not meant to continue to this point")
       return 3000
     endFunction
 
 -----------------------------  Handle_Sys_Create  ---------------------------------
-
+-- Print the argument by calling PrintVirtualString, then return an integer value
   function Handle_Sys_Create (filename: ptr to array of char) returns int
-      PrintVirtualString(filename)
+      print ("Handle_Sys_Create invoked!\n")
+      printHexVar("virt addr of filename = ", filename asInteger)
+      print ("filename = ")
+      print (LocalizeVirtualString(filename))
+      nl ()
       return 4000
     endFunction
 
 -----------------------------  Handle_Sys_Open  ---------------------------------
-
+-- Print the argument by calling PrintVirtualString, then return an integer value
   function Handle_Sys_Open (filename: ptr to array of char) returns int
-      PrintVirtualString(filename)
+      print ("Handle_Sys_Open invoked!\n")
+      printHexVar("virt addr of filename = ", filename asInteger)
+      print ("filename = ")
+      print(LocalizeVirtualString(filename))
+      nl ()
       return 5000
     endFunction
 
 -----------------------------  Handle_Sys_Read  ---------------------------------
-
+-- Simply print the integer arguments, and return an integer value from the system call
+-- 'buffer' gets cast to an integer and printed
   function Handle_Sys_Read (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
-      printInt(fileDesc)
-      printInt(buffer asInteger)
-      printInt(sizeInBytes)
+      print ("Handle_Sys_Read invoked!\n")
+      printIntVar("fileDesc", fileDesc)
+      printHexVar("virt addr of buffer", buffer asInteger)
+      printIntVar("sizeInBytes", sizeInBytes)
       return 6000
     endFunction
 
 -----------------------------  Handle_Sys_Write  ---------------------------------
-
+-- Simply print the integer arguments, and return an integer value from the system call
+-- 'buffer' gets cast to an integer and printed
   function Handle_Sys_Write (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
-      printInt(fileDesc)
-      printInt(buffer asInteger)
-      printInt(sizeInBytes)
+      print ("Handle_Sys_Write invoked!\n")
+      printIntVar("fileDesc", fileDesc)
+      printHexVar("virt addr of buffer", buffer asInteger)
+      printIntVar("sizeInBytes", sizeInBytes)     
       return 7000
     endFunction
 
 -----------------------------  Handle_Sys_Seek  ---------------------------------
-
+-- Simply print the integer arguments, and return an integer value from the system call
   function Handle_Sys_Seek (fileDesc: int, newCurrentPos: int) returns int
-      printInt(fileDesc)
-      printInt(newCurrentPos)
+      print ("Handle_Sys_Seek invoked!\n")
+      printIntVar("fileDesc", fileDesc)
+      printIntVar("newCurrentPos", newCurrentPos)
       return 8000
     endFunction
 
 -----------------------------  Handle_Sys_Close  ---------------------------------
-
+-- Simply print the integer argument
   function Handle_Sys_Close (fileDesc: int)
-      printInt(fileDesc)
+      print ("Handle_Sys_Close invoked!\n")
+      printIntVar("fileDesc", fileDesc)
     endFunction
 
 -----------------------------  DiskDriver  ---------------------------------

@@ -81,6 +81,10 @@
 	.data
 	.align
 ! String constants
+_StringConst_2:
+	.word	4			! length
+	.ascii	"Test"
+	.align
 _StringConst_1:
 	.word	37			! length
 	.ascii	"\nMy user-level program is running!!!\n"
@@ -94,9 +98,9 @@ _mainEntry:
 	set	0x5cad83ab,r3		! .  hashVal = 1554875307
 	call	_CheckVersion_P_MyProgram_	! .
 	cmp	r1,0			! .
-	be	_Label_2		! .
+	be	_Label_3		! .
 	ret				! .
-_Label_2:				! .
+_Label_3:				! .
 	call	_heapInitialize
 	jmp	main
 ! 
@@ -125,7 +129,7 @@ _CheckVersion_P_MyProgram_:
 	.export	_CheckVersion_P_MyProgram_
 	set	0x5cad83ab,r4		! myHashVal = 1554875307
 	cmp	r3,r4
-	be	_Label_3
+	be	_Label_4
 	set	_CVMess1,r1
 	call	_putString
 	mov	r2,r1			! print using package
@@ -150,7 +154,7 @@ _CheckVersion_P_MyProgram_:
 	call	_putString
 	mov	1,r1
 	ret	
-_Label_3:
+_Label_4:
 	mov	0,r1
 ! Make sure _P_UserSystem_ has hash value 0xd3ed0851 (decimal -739440559)
 	set	_packageName,r2
@@ -158,8 +162,8 @@ _Label_3:
 	call	_CheckVersion_P_UserSystem_
 	.import	_CheckVersion_P_UserSystem_
 	cmp	r1,0
-	bne	_Label_4
-_Label_4:
+	bne	_Label_5
+_Label_5:
 	ret
 _CVMess1:	.ascii	"\nVERSION CONSISTENCY ERROR: Package '\0"
 _CVMess2:	.ascii	"' uses package '\0"
@@ -177,34 +181,58 @@ main:
 	push	r13
 	set	_RoutineDescriptor_main,r1
 	push	r1
-	mov	2,r1
-_Label_8:
+	mov	4,r1
+_Label_12:
 	push	r0
 	sub	r1,1,r1
-	bne	_Label_8
+	bne	_Label_12
 	mov	5,r13		! source line 5
 	mov	"\0\0FU",r10
 ! VARIABLE INITIALIZATION...
 ! CALL STATEMENT...
-!   _temp_5 = _StringConst_1
+!   _temp_6 = _StringConst_1
 	set	_StringConst_1,r1
+	store	r1,[r14+-16]
+!   Prepare Argument: offset=8  value=_temp_6  sizeInBytes=4
+	load	[r14+-16],r1
+	store	r1,[r15+0]
+!   Call the function
+	mov	12,r13		! source line 12
+	mov	"\0\0CE",r10
+	call	print
+! ASSIGNMENT STATEMENT...
+	mov	13,r13		! source line 13
+	mov	"\0\0AS",r10
+!   _temp_7 = _StringConst_2
+	set	_StringConst_2,r1
 	store	r1,[r14+-12]
-!   Prepare Argument: offset=8  value=_temp_5  sizeInBytes=4
+!   Prepare Argument: offset=8  value=_temp_7  sizeInBytes=4
 	load	[r14+-12],r1
 	store	r1,[r15+0]
 !   Call the function
-	mov	11,r13		! source line 11
+	mov	13,r13		! source line 13
+	mov	"\0\0CA",r10
+	call	_P_UserSystem_Sys_Create
+!   Retrieve Result: targetName=retVal  sizeInBytes=4
+	load	[r15],r1
+	store	r1,[r14+-20]
+! CALL STATEMENT...
+!   Prepare Argument: offset=8  value=retVal  sizeInBytes=4
+	load	[r14+-20],r1
+	store	r1,[r15+0]
+!   Call the function
+	mov	14,r13		! source line 14
 	mov	"\0\0CE",r10
-	call	print
+	call	printInt
 ! CALL STATEMENT...
 !   Call the function
-	mov	12,r13		! source line 12
+	mov	15,r13		! source line 15
 	mov	"\0\0CA",r10
 	call	_P_UserSystem_Sys_Shutdown
 ! RETURN STATEMENT...
-	mov	12,r13		! source line 12
+	mov	15,r13		! source line 15
 	mov	"\0\0RE",r10
-	add	r15,12,r15
+	add	r15,20,r15
 	pop	r13
 	pop	r14
 	ret
@@ -213,17 +241,31 @@ _Label_8:
 ! 
 _RoutineDescriptor_main:
 	.word	_sourceFileName
-	.word	_Label_6
+	.word	_Label_8
 	.word	0		! total size of parameters
-	.word	8		! frame size = 8
-	.word	_Label_7
+	.word	16		! frame size = 16
+	.word	_Label_9
 	.word	-12
 	.word	4
+	.word	_Label_10
+	.word	-16
+	.word	4
+	.word	_Label_11
+	.word	-20
+	.word	4
 	.word	0
-_Label_6:
+_Label_8:
 	.ascii	"main\0"
 	.align
-_Label_7:
+_Label_9:
 	.byte	'?'
-	.ascii	"_temp_5\0"
+	.ascii	"_temp_7\0"
+	.align
+_Label_10:
+	.byte	'?'
+	.ascii	"_temp_6\0"
+	.align
+_Label_11:
+	.byte	'I'
+	.ascii	"retVal\0"
 	.align
