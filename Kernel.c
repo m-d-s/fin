@@ -1208,7 +1208,7 @@ behavior HoareCondition
     endFunction
 
 ----------------------------- InitFirstProcess  --------------------------
--- In order to run a user level program we will first need to obtain a thre to supply 
+-- In order to run a user level program we will first need to obtain a thred to supply 
 -- the program with its own cpu context. To do this you must request a thread from 
 -- the thread manager, initialize it, and fork. You do not want to just fork the current 
 -- thread because this function must return after it has completed this work. 
@@ -1222,6 +1222,23 @@ behavior HoareCondition
     endFunction
 
 ----------------------------- StartUserProcess  --------------------------
+-- This function is called in order to set up an address space and make all necessary alterations
+-- to the current thread and context of the system to allow a user process to begin. The steps
+-- include:
+--  * Obtaining a new process control block from the process manager.
+--  * Connecting the current thread to the user's process
+--  * Retrieving and opening an executable file from disk using the process manager.
+--  * Loading the executable program into the address space of the process control block
+--  * Initializing the value of the process' program counter
+--  * Initializing the value of the top of the user level stack
+--  * Cleaning up the system's stack
+--  * Setting the value of the CPU's page table registers
+--  * Marking the thread as a user level thread so that priviliges do not remain in system mode
+--  * Calling the external function 'BecomeUserThread' passing in stack top values and initial PC.
+--    This function will be where the system and user stack values will be set, the mode bit will
+--    be cleared, the paging bit will be set to enable virtual memory mapping, interrupts will get
+--    enabled, and finally the process will jump to the address denoted by the passed PC value 
+
   function StartUserProcess (arg: int)
     var 
       oldIntStat, initPC, initStackTop: int
@@ -1242,7 +1259,7 @@ behavior HoareCondition
         FatalError("Encontered problem trying to open file")
     endIf
     
-    initPC = openFile.LoadExecutable(&obtainedPCB.addrSpace) -- Load executable program and catch program counter
+    initPC = openFile.LoadExecutable(&obtainedPCB.addrSpace) -- Load executable program, create logical address space and catch program counter
       
     if initPC == -1                          -- report an error if a problem occured during exec load
         FatalError("Encountered problem trying to load executable")
@@ -1256,11 +1273,6 @@ behavior HoareCondition
     oldIntStat = SetInterruptsTo (DISABLED)           -- Disable interrupts
     obtainedPCB.addrSpace.SetToThisPageTable ()       -- Initialize page table registers for this process
     currentThread.isUserThread = true                 -- indicate that thread is controlled by user level process
-    --printInt(*initSystemStackTop)
-   nl()
-    printInt(initStackTop)
-   nl()
-    printInt(initPC)
     BecomeUserThread(initStackTop, initPC, initSystemStackTop asInteger) -- jump into user level main routine and never return
     endFunction
 
@@ -1984,6 +1996,22 @@ behavior HoareCondition
       return 0
     endFunction
 
+--------------------------- PrintVirtualString ---------------------------------
+  function PrintVirtualString (src: ptr to array of char) 
+      var
+        strBuff: array [MAX_STRING_SIZE] of char
+        retVal: int
+
+      retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&strBuff,
+                                                                      src asInteger,
+                                                                      MAX_STRING_SIZE)
+      if  retVal < 0
+         FatalError("Error occurred while attempting to fetch string from virtual address space")
+      else
+         print(&strBuff)
+      endIf
+    endFunction
+
 -----------------------------  Handle_Sys_Exit  ---------------------------------
 
   function Handle_Sys_Exit (returnStatus: int)
@@ -1994,7 +2022,7 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Shutdown  ---------------------------------
 
   function Handle_Sys_Shutdown ()
-      --FatalError("Syscall 'Shutdown' was invoked by a user thread")
+      FatalError("Syscall 'Shutdown' was invoked by a user thread")
     endFunction
 
 -----------------------------  Handle_Sys_Yield  ---------------------------------
@@ -2019,21 +2047,21 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Exec  ---------------------------------
 
   function Handle_Sys_Exec (filename: ptr to array of char) returns int
-      -- NOT IMPLEMENTED       
+      PrintVirtualString(filename)
       return 3000
     endFunction
 
 -----------------------------  Handle_Sys_Create  ---------------------------------
 
   function Handle_Sys_Create (filename: ptr to array of char) returns int
-      -- NOT IMPLEMENTED
+      PrintVirtualString(filename)
       return 4000
     endFunction
 
 -----------------------------  Handle_Sys_Open  ---------------------------------
 
   function Handle_Sys_Open (filename: ptr to array of char) returns int
-      -- NOT IMPLEMENTED
+      PrintVirtualString(filename)
       return 5000
     endFunction
 
@@ -2041,7 +2069,7 @@ behavior HoareCondition
 
   function Handle_Sys_Read (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
       printInt(fileDesc)
-
+      printInt(buffer asInteger)
       printInt(sizeInBytes)
       return 6000
     endFunction
@@ -2050,7 +2078,7 @@ behavior HoareCondition
 
   function Handle_Sys_Write (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
       printInt(fileDesc)
-
+      printInt(buffer asInteger)
       printInt(sizeInBytes)
       return 7000
     endFunction
