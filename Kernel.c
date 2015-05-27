@@ -1225,7 +1225,7 @@ behavior HoareCondition
   function StartUserProcess (arg: int)
     var 
       oldIntStat, initPC, initStackTop: int
-      initSystemStackTop: ptr to int
+      initSystemStackTop: ptr to void
       obtainedPCB: ptr to ProcessControlBlock
       openFile: ptr to OpenFile
 
@@ -1254,9 +1254,14 @@ behavior HoareCondition
     initSystemStackTop = &currentThread.systemStack[SYSTEM_STACK_SIZE - 1] -- clean up system stack
 
     oldIntStat = SetInterruptsTo (DISABLED)           -- Disable interrupts
-    obtainedPCB.addrSpace.SetToThisPageTable ()                 -- Initialize page table registers for this process
+    obtainedPCB.addrSpace.SetToThisPageTable ()       -- Initialize page table registers for this process
     currentThread.isUserThread = true                 -- indicate that thread is controlled by user level process
-    BecomeUserThread(initStackTop, initPC, *initSystemStackTop) -- jump into user level main routine and never return
+    --printInt(*initSystemStackTop)
+   nl()
+    printInt(initStackTop)
+   nl()
+    printInt(initPC)
+    BecomeUserThread(initStackTop, initPC, initSystemStackTop asInteger) -- jump into user level main routine and never return
     endFunction
 
 -----------------------------  FrameManager  ---------------------------------
