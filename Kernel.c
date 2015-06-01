@@ -2053,7 +2053,32 @@ behavior HoareCondition
     endFunction
 
 -----------------------------  Handle_Sys_Exec  ---------------------------------
--- Print the argument by calling PrintVirtualString, then return an integer value
+-- Sys_Exec was obviously more intricate than the other syscall handlers, but I was 
+-- able to reuse a lot of code from the StartUserProcess function. The main differences
+-- being that you already have a process control block at this point and do not need to
+-- make a new one. Also you need to be mindful while handling the routines associated
+-- with the logical address space, since if the routine fails you need to be able to 
+-- abort the Sys_Exec function and return to the original control flow. This would
+-- not be possible if you just overwrote the current process' address space so you
+-- need to create a new address space object and then swap it out for the old one
+-- once you know that the routine was a success. It is also imperative to return the
+-- frames inside the old address space before discontinuing to reference it, otherwise
+-- you will be leaking an important system resource.
+
+-- The only real complication that I encuntered was while trying to localize the filename
+-- string. I had originally written a small function that would make the call to 
+-- 'GetStringFromVirtual', do a bit of error checking, and upon success would return
+-- a pointer to the string. It seemed like a reasonable function since I needed to repeat
+-- this behavior in Handle_Sys_Open/Create. Unfortunately my function had some side effects
+-- that were not easy to spot, and as a result I spent a fair bit of time trying to figure
+-- out why my code was not working. I ended up abandoning the function once I saw that it
+-- was causing my problem.
+
+-- I had also not initially realized that this function was supposed to return negative one
+-- in the event of a failure. I was originally triggering fatal errors, which obviously 
+-- did not match the expected behavior in the test files. It only took a little investigation
+-- to determine what I was actually meant to do, and had it all sorted out. 
+
   function Handle_Sys_Exec (filename: ptr to array of char) returns int
 
     var 
@@ -2061,47 +2086,40 @@ behavior HoareCondition
       initSystemStackTop: ptr to int
       openFile: ptr to OpenFile
       newAddrSpace: AddrSpace = new AddrSpace  
-   --   localString: ptr to array [*] of char
       localString: array [MAX_STRING_SIZE] of char
       retVal: int
-    --localString = LocalizeVirtualString(filename)
  
-    retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&localString,
-                                                                      filename asInteger,
-                                                                      MAX_STRING_SIZE)
-       
+    -- Copy the filename from its virtual location into a physical location that is accessible by the kernel
+    retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&localString, filename asInteger, MAX_STRING_SIZE)
 
-
-    --if localString == null
-      --  print("Error occurred while attempting to localize string\n")
-     --   return -1
-   -- endIf
+    if retVal < 0                 -- report an error if there was a problem trying to localize the filename string
+        return -1
+    endIf
 
     openFile = fileManager.Open(&localString) -- Open a file using the file manager
 
     if openFile == null                      -- report an error if the OpenFile object is null
-      print("Error occurred while attempting to open a file\n")
-      return -1
+        return -1
     endIf
 
-    newAddrSpace.Init()
+    newAddrSpace.Init()                      -- Initialize the address space that was created on the system stack
     initPC = openFile.LoadExecutable(&newAddrSpace) -- Load executable program, create logical address space and catch program counter
       
     if initPC == -1                          -- report an error if a problem occured during exec load
-        FatalError("Encountered problem trying to load executable")
+        return -1
     endIf
     
     fileManager.Close(openFile)                       -- Close the open file to free OpenFile system resource
 
-    frameManager.ReturnAllFrames(&currentThread.myProcess.addrSpace)
-    currentThread.myProcess.addrSpace = newAddrSpace    
+    frameManager.ReturnAllFrames(&currentThread.myProcess.addrSpace)  -- Return frames from old address space to avoid resource leak
+    currentThread.myProcess.addrSpace = newAddrSpace                  -- Swap out the old address space with the new one
 
     initStackTop = newAddrSpace.numberOfPages * PAGE_SIZE  -- Calculate the initial top of the user level stack
     initSystemStackTop = &currentThread.systemStack[SYSTEM_STACK_SIZE - 1] -- clean up system stack
 
-    oldIntStat = SetInterruptsTo (DISABLED)           -- Disable interrupts
-    newAddrSpace.SetToThisPageTable ()       -- Initialize page table registers for this process
-    currentThread.isUserThread = true                 -- indicate that thread is controlled by user level process
+    oldIntStat = SetInterruptsTo (DISABLED)                     -- Disable interrupts
+    newAddrSpace.SetToThisPageTable ()                          -- Initialize page table registers for this process
+    currentThread.isUserThread = true                           -- indicate that thread is controlled by user level process
     BecomeUserThread(initStackTop, initPC, initSystemStackTop asInteger) -- jump into user level main routine and never return
     FatalError("Not meant to continue to this point")
       return 3000
@@ -2110,6 +2128,9 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Create  ---------------------------------
 -- Print the argument by calling PrintVirtualString, then return an integer value
   function Handle_Sys_Create (filename: ptr to array of char) returns int
+      localString: array [MAX_STRING_SIZE]
+      retVal: int
+
       print ("Handle_Sys_Create invoked!\n")
       printHexVar("virt addr of filename = ", filename asInteger)
       print ("filename = ")
