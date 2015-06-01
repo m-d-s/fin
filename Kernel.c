@@ -2058,24 +2058,33 @@ behavior HoareCondition
 
     var 
       oldIntStat, initPC, initStackTop: int
-      initSystemStackTop: ptr to void
+      initSystemStackTop: ptr to int
       openFile: ptr to OpenFile
       newAddrSpace: AddrSpace = new AddrSpace  
-      localString: ptr to array [*] of char
-    localString = LocalizeVirtualString(filename)
+   --   localString: ptr to array [*] of char
+      localString: array [MAX_STRING_SIZE] of char
+      retVal: int
+    --localString = LocalizeVirtualString(filename)
+ 
+    retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&localString,
+                                                                      filename asInteger,
+                                                                      MAX_STRING_SIZE)
+       
 
-    if localString == null
-        print("Error occurred while attempting to localize string\n")
-        return -1
-    endIf
-print(localString)
-        openFile = fileManager.Open(localString) -- Open a file using the file manager
+
+    --if localString == null
+      --  print("Error occurred while attempting to localize string\n")
+     --   return -1
+   -- endIf
+
+    openFile = fileManager.Open(&localString) -- Open a file using the file manager
 
     if openFile == null                      -- report an error if the OpenFile object is null
       print("Error occurred while attempting to open a file\n")
       return -1
     endIf
-    
+
+    newAddrSpace.Init()
     initPC = openFile.LoadExecutable(&newAddrSpace) -- Load executable program, create logical address space and catch program counter
       
     if initPC == -1                          -- report an error if a problem occured during exec load
