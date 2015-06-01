@@ -2128,13 +2128,18 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Create  ---------------------------------
 -- Print the argument by calling PrintVirtualString, then return an integer value
   function Handle_Sys_Create (filename: ptr to array of char) returns int
-      localString: array [MAX_STRING_SIZE]
-      retVal: int
+      var
+        localString: array [MAX_STRING_SIZE] of char
+        retVal: int
 
       print ("Handle_Sys_Create invoked!\n")
-      printHexVar("virt addr of filename = ", filename asInteger)
+      printHexVar ("virt addr of filename = ", filename asInteger)
+      retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&localString, filename asInteger, MAX_STRING_SIZE)
+      if retVal < 0
+          FatalError("A problem arose while localizing a string from a logical address")
+      endIf
       print ("filename = ")
-      print (LocalizeVirtualString(filename))
+      print (&localString)
       nl ()
       return 4000
     endFunction
@@ -2142,10 +2147,18 @@ behavior HoareCondition
 -----------------------------  Handle_Sys_Open  ---------------------------------
 -- Print the argument by calling PrintVirtualString, then return an integer value
   function Handle_Sys_Open (filename: ptr to array of char) returns int
+      var
+        localString: array [MAX_STRING_SIZE] of char
+        retVal: int
+
       print ("Handle_Sys_Open invoked!\n")
       printHexVar("virt addr of filename = ", filename asInteger)
+      retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&localString, filename asInteger, MAX_STRING_SIZE)
+      if retVal < 0
+          FatalError("A problem arose while localizing a string from a logical address")
+      endIf
       print ("filename = ")
-      print(LocalizeVirtualString(filename))
+      print (&localString)
       nl ()
       return 5000
     endFunction
