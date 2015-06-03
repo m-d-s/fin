@@ -2,6 +2,9 @@ code Kernel
 
   -- Michael Simpson
 
+  -- All work produced in this assignment was based upon the instructions outlined
+  -- in the proj5.pdf document written by Harry Porter.
+
 -----------------------------  InitializeScheduler  ---------------------------------
 
   function InitializeScheduler ()
@@ -1223,8 +1226,7 @@ behavior HoareCondition
 
 ----------------------------- StartUserProcess  --------------------------
 -- This function is called in order to set up an address space and make all necessary alterations
--- to the current thread and context of the system to allow a user process to begin. The steps
--- include:
+-- to the current thread and system context to allow a user process to begin. The steps include:
 --  * Obtaining a new process control block from the process manager.
 --  * Connecting the current thread to the user's process
 --  * Retrieving and opening an executable file from disk using the process manager.
@@ -1998,28 +2000,40 @@ behavior HoareCondition
     endFunction
 
 --------------------------- LocalizeVirtualString ---------------------------------
+
+-- ****************************************************************************************
+-- * This is a function that I wrote that did not work. I ended up testing it by printing *
+-- * the pointer to strBuff and the pointer that gets returned from the function and the  *
+-- * values of each were not the same. It is my belief that this function did not work    *
+-- * because it essentially undoes the work that gets done by the GetStringFromVirtual    *
+-- * function. I realize that it may seem unnecessary to even have this function in the   *
+-- * first place, but I needed the functionality in a few places in this program and this *
+-- * call was cleaner. I am the definition in, commented out, somewhat as a relic of an   *
+-- * incorrect route that I went down while producing my solution to this assignment.     *
+-- ****************************************************************************************
+
 -- Take an array of characters that is in the current threads virtual address
 -- space, copy it's contents into a buffer array that gets created on the 
 -- system stack, and return a pointer to the string. This function was modeled from the routine
 -- described on page 30 of the assignment #5 specification.
-  function LocalizeVirtualString (src: ptr to array of char) returns ptr to array [*] of char 
-      var
-        strBuff: array [MAX_STRING_SIZE] of char
-        retVal: int
-      
-      retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&strBuff,
-                                                                      src asInteger,
-                                                                      MAX_STRING_SIZE)
-      if  retVal < 0
-         return null
-      endIf
-         return &strBuff
-    endFunction
+--  function LocalizeVirtualString (src: ptr to array of char) returns ptr to array [*] of char 
+--      var
+--        strBuff: array [MAX_STRING_SIZE] of char
+--        retVal: int
+--      
+--      retVal = currentThread.myProcess.addrSpace.GetStringFromVirtual(&strBuff,
+--                                                                      src asInteger,
+--                                                                      MAX_STRING_SIZE)
+--      if  retVal < 0
+--         return null
+--      endIf
+--         return &strBuff
+--    endFunction
 
 -----------------------------  Handle_Sys_Exit  ---------------------------------
 -- Simply print the integer argument
   function Handle_Sys_Exit (returnStatus: int)
-      print ("Handel_Sys_Exit invoked!\n")
+      print ("Handle_Sys_Exit invoked!\n")
       printIntVar ("returnStatus", returnStatus)
       return
     endFunction
@@ -2032,20 +2046,20 @@ behavior HoareCondition
     endFunction
 
 -----------------------------  Handle_Sys_Yield  ---------------------------------
-
+-- Only need to print a string in this instance
   function Handle_Sys_Yield ()
       print ("Handle_Sys_Yield invoked!\n")
     endFunction
 
 -----------------------------  Handle_Sys_Fork  ---------------------------------
--- simply return an integer value from the system call
+-- simply return the fork system code
   function Handle_Sys_Fork () returns int
       print ("Handle_Sys_Fork invoked!\n")
       return 1000
     endFunction
 
 -----------------------------  Handle_Sys_Join  ---------------------------------
--- Simply print the integer argument, and return an integer value from the system call
+-- Simply print the integer argument, and return the Join system code
   function Handle_Sys_Join (processID: int) returns int
       print ("Handle_Sys_Join invoked!\n")
       printIntVar("processID", processID)
@@ -2122,11 +2136,12 @@ behavior HoareCondition
     currentThread.isUserThread = true                           -- indicate that thread is controlled by user level process
     BecomeUserThread(initStackTop, initPC, initSystemStackTop asInteger) -- jump into user level main routine and never return
     FatalError("Not meant to continue to this point")
-      return 3000
+      return 3000        -- Should never return this system code
     endFunction
 
 -----------------------------  Handle_Sys_Create  ---------------------------------
--- Print the argument by calling PrintVirtualString, then return an integer value
+-- Copy the filename from its virtual location into a physical location that is accessible by the kernel
+-- Then print the filename and return the create system code
   function Handle_Sys_Create (filename: ptr to array of char) returns int
       var
         localString: array [MAX_STRING_SIZE] of char
@@ -2145,7 +2160,8 @@ behavior HoareCondition
     endFunction
 
 -----------------------------  Handle_Sys_Open  ---------------------------------
--- Print the argument by calling PrintVirtualString, then return an integer value
+-- Copy the filename from its virtual location into a physical location that is accessible by the kernel
+-- Then print the filename and return the open system code
   function Handle_Sys_Open (filename: ptr to array of char) returns int
       var
         localString: array [MAX_STRING_SIZE] of char
@@ -2165,7 +2181,7 @@ behavior HoareCondition
 
 -----------------------------  Handle_Sys_Read  ---------------------------------
 -- Simply print the integer arguments, and return an integer value from the system call
--- 'buffer' gets cast to an integer and printed
+-- 'buffer' gets cast to an integer and printed. Then return read the system code
   function Handle_Sys_Read (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
       print ("Handle_Sys_Read invoked!\n")
       printIntVar("fileDesc", fileDesc)
@@ -2176,7 +2192,7 @@ behavior HoareCondition
 
 -----------------------------  Handle_Sys_Write  ---------------------------------
 -- Simply print the integer arguments, and return an integer value from the system call
--- 'buffer' gets cast to an integer and printed
+-- 'buffer' gets cast to an integer and printed. Then return Write the system code
   function Handle_Sys_Write (fileDesc: int, buffer: ptr to char, sizeInBytes: int) returns int
       print ("Handle_Sys_Write invoked!\n")
       printIntVar("fileDesc", fileDesc)
@@ -2186,7 +2202,7 @@ behavior HoareCondition
     endFunction
 
 -----------------------------  Handle_Sys_Seek  ---------------------------------
--- Simply print the integer arguments, and return an integer value from the system call
+-- Simply print the integer arguments, and return the Seek system code
   function Handle_Sys_Seek (fileDesc: int, newCurrentPos: int) returns int
       print ("Handle_Sys_Seek invoked!\n")
       printIntVar("fileDesc", fileDesc)
